@@ -62,3 +62,5 @@ def extract_names(title, anime_name, anime_alt_names=[]):
 
     return original_episode_name.strip(), episode_name, episode_resolution, release_group
 
+if __name__ == "__main__":
+    print(extract_names("[Marukazoku][Chibi Maruko-chan II][1326][2021.02.20][BIG5][1080P][MP4].mp4", "Chibi Maruko-chan II"))
