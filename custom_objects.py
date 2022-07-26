@@ -11,19 +11,29 @@ class TypeEnum(enum.Enum):
 
 
 class ParameterObject:
-    param: str = None
-    value: str = None
+    __slots__ = "param", "value"
 
     def __init__(self, param, value) -> (None):
-        self.param = param
-        self.value = str(value)
+        self.param: str = param
+        self.value: str = str(value)
 
     def to_param(self):
         pass
 
 
 class ExtractedNameObject:
+    __slots__ = (
+        'filename',
+        'release_group',
+        'episode_name',
+        'resolution',
+        'crc',
+        'known_tags',
+        'other_tags'
+    )
+
     def __init__(self) -> (None):
+        self.filename: str = ""
         # basic info, I think
         self.release_group: str = ""
         self.episode_name: str = ""
@@ -36,15 +46,16 @@ class ExtractedNameObject:
         self.other_tags: List[str] = list()
 
     def is_ready(self) -> (bool):
-        return self.episode_name != ""
+        return self.filename != ""
 
     def __str__(self) -> (str):
         return f"\nExtracted Name: \n" \
-            f"\tGroup: {self.release_group}\n" \
-            f"\tName: {self.episode_name}\n" \
-            f"\tCRC: {self.crc}\n" \
-            f"\tResolution: {self.resolution} \n" \
-            f"\tOther Tags: {[item for item in self.other_tags]}"
+               f"\tGroup: {self.release_group}\n" \
+               f"\tName: {self.episode_name}\n" \
+               f"\tCRC: {self.crc}\n" \
+               f"\tResolution: {self.resolution} \n" \
+               f"\tOther Tags: {[item for item in self.other_tags]} \n" \
+               f"\tOriginal filename: {self.filename}"
 
 
 class ParamItem(ParameterObject):
@@ -53,8 +64,15 @@ class ParamItem(ParameterObject):
 
 
 class SSAEncodeProfile:
-
+    """
+    A class to put all encode parameters.
+    I may consider switching to ffmpeg's encode profile file (But I don't know how that works as of this writing)
+    """
     class ParamList:
+        """
+        For video codec parameters
+        (Maybe audio codec as well, haven't tried yet)
+        """
 
         _params: List[ParamItem]
         _params_length = 0
@@ -100,6 +118,9 @@ class SSAEncodeProfile:
                 return self.spliter.join([item.to_param() for item in self._params])
 
     # use ssa's 1080p profile as default
+    # todo: Note written in July 2022:
+    # todo: I just learned what __slot__ can do, and I don't know if I should use it here
+    # todo: maybe I will put these variables in __init__ then declare a __slot__?
     audio_bitrate = 192  # slider, range from 8 to 320
     audio_codec = 'aac'  # combobox with edittext
     _video_resolution = 1080  # I don't know, combobox?
@@ -111,7 +132,8 @@ class SSAEncodeProfile:
     attachment_copy = False
 
     # todo check ffmpeg for a proper subtitle decoder
-    # Required to do MP4 encode, but I prefer MKV. None = ignore subtitle track, ''=copy track
+    # Required to do MP4 encode because it needs hard-subs. I prefer MKV for soft-subs so I won't need it.
+    # None = ignore subtitle track; '' = copy track; 'xxx' = specify a subtitle decoder
     subtitle_decoder = None
 
     # todo: there's more option in ssa's task.py
@@ -156,25 +178,42 @@ class SSAEncodeProfile:
     colorspace = 1
 
     def as_ffmpeg_python_args(self) -> (Dict):
-        to_return = {}
-        to_return['c:a'] = self.audio_codec
-        to_return['c:v'] = self.video_codec
-        # todo: subtitle decoder
-        to_return['b:a'] = f'{self.audio_bitrate}k'
-        to_return['profile:v'] = self.video_profile
-        to_return[self.video_codec_params.name] = self.video_codec_params.as_string_params()
-        to_return['crf'] = self.video_quality
-        to_return['preset'] = self.preset
-        to_return['pix_fmt'] = self.pix_fmt
-        to_return[self.vf.name] = self.vf.as_string_params()
-        to_return['color_range'] = self.color_range
-        to_return['color_primaries'] = self.color_primaries
-        to_return['color_trc'] = self.color_trc
-        to_return['colorspace'] = self.colorspace
+        to_return = {'c:a': self.audio_codec,
+                     'c:v': self.video_codec,
+                     'b:a': f'{self.audio_bitrate}k',
+                     'profile:v': self.video_profile,
+                     self.video_codec_params.name: self.video_codec_params.as_string_params(),
+                     'crf': self.video_quality,
+                     'preset': self.preset,
+                     'pix_fmt': self.pix_fmt,
+                     self.vf.name: self.vf.as_string_params(),
+                     'color_range': self.color_range,
+                     'color_primaries': self.color_primaries,
+                     'color_trc': self.color_trc,
+                     'colorspace': self.colorspace}
+        # todo: subtitle decoder for MP4 container
         return to_return
+
+    def set_video_resolution(self, resolution: int):
+        self._video_resolution = resolution
+        self.vf.add_param(
+            'scale', f'-1:{resolution}:spline+accurate_rnd+full_chroma_int'
+        )
+
+    def get_video_resolution(self):
+        return self._video_resolution
 
 
 class Tag:
+    """
+    todo: what is this for?
+    I forgot....
+    """
+    __slots__ = (
+        "value",
+        "type_enum"
+    )
+
     def __init__(self, value: str, type_enum: TypeEnum) -> (None):
         self.value = value
         self.type_enum = type_enum
@@ -190,6 +229,13 @@ class Tag:
 
 
 class TagList:
+    """
+    An object for all unknown tags
+    todo: kinda forgot why I create this class in the first place
+    """
+
+    __slots__ = "tags", "tag_type_map"
+
     def __init__(self) -> (None):
         self.tags: List[Tag] = list()
         self.tag_type_map: Dict = {}
@@ -210,7 +256,9 @@ class TagList:
         return self.tag_type_map.get(tag)
 
     def is_ready(self) -> (bool):
-        return self.get_tag_index_by_type(TypeEnum.GROUP) is not None and self.get_tag_index_by_type(TypeEnum.EPISODE_NAME) is not None
+        # todo: probably deprecated?
+        return self.get_tag_index_by_type(TypeEnum.GROUP) is not None and \
+               self.get_tag_index_by_type(TypeEnum.EPISODE_NAME) is not None
 
     def get_size(self) -> (int):
         return len(self.tags)
