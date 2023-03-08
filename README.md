@@ -8,7 +8,7 @@
 
  I watch (a lot of) anime :) and if possibe, I want to archive them. In the search of group that do small animation encode, I found Small Sized Animations (SSA). It has small file size and relativly decent quality.
 
- In late 2021, SSA closed the server ([read here](https://ny.iss.one/view/1445824#com-1)) and shared the encode setting used to encode anime. It was available at the website but as of this writing, the server is down. The good news is that [someone](https://ny.iss.one/view/1445824#com-17) had archived the website so I am able to read it [here](https://pastebin.com/JmWGsEng). SSA commisioned his/her friend to make a program (which I wasn't able to find anywhere). Then, I thought of making my own script. I put it into action, so here I am.
+ In late 2021, SSA closed the server ([read here](https://ny.iss.one/view/1445824#com-1)) and shared the encode setting used to encode anime. It was available at the website but as of this writing (March 7, 2023), the server is down. The good news is that [someone](https://ny.iss.one/view/1445824#com-17) had archived the website so I am able to read it [here](https://pastebin.com/JmWGsEng). SSA commisioned his/her friend to make a program (which I wasn't able to find anywhere). Then, I thought of making my own script. I put it into action, so here I am.
 
 ## and then
 
@@ -23,8 +23,6 @@
  I use this repository to backup my code in case my storage died. Until I sort out my files it is going to be messy.
 
  As stated above, this script is designed to encode anime using SSA's encode settings and therefore it is not a general purpose anime encoder.
-
- This script
 
  Feel free to use it if it useful (probably not).
 
@@ -63,13 +61,17 @@
 
  see `update_filename` in `utils.py`
 
- when `--naming` is specified, some certain text will be replaced:
+ ~~when `--naming` is specified, some certain text will be replaced:~~
 
-- {group} will be replaced by release group from input file
-- {episode_name} will be replaced by episode name from input file
-- {resolution} will be replaced by resolution's height from output file
-- {crc} will be replaced by generated crc32 value from output file
-- {tags} will be replaced by everything else from input file's name that's not group, episode name, resolution or crc32.
+~~- {group} will be replaced by release group from input file~~
+
+~~- {episode_name} will be replaced by episode name from input file~~
+
+~~- {resolution} will be replaced by resolution's height from output file~~
+
+~~- {crc} will be replaced by generated crc32 value from output file~~
+
+~~- {tags} will be replaced by everything else from input file's name that's not group, episode name, resolution or crc32.~~
 
  So, given
 
@@ -80,6 +82,32 @@
  say it is a 720p encode and the output file's CRC32 value is *ABCDEFGH*
 
  the ouput file will be renamed into *[SomeGroup] Yofukashi no Uta - 01v2 [SubsPlease source] [720] [ABCDEFGH]*
+
+ **Update:** I forgot that I added `naming` into preset file. Instead of specifying `--naming`, use `"naming": ""` in preset files.
+
+## Using `main.py`
+
+### the short one
+
+ The easiest way of using it would be: `python main.py -i "/whatever/path/to/the/file.mkv" -o "/folder/to/save/the/encoding" --presets presets/my_encode_profile_h265_10bit_1080p_opus.json`
+
+ Python version should be `3.7` or newer because of annotation in the code. I wasn't thinking about compatibility on older systems. Gomennasai...
+
+### addition to "the short one"
+
+ It was developed with Python 3.10 using Windows 10, and I was able to get it running with Python 3.8 using Linux (Zorin OS 16.2). If Python 3.8 works then so should 3.7.
+
+ By passing a folder to `-i`, the script will scan all video files (excluding sub-folders, tested with MKVs) and encode all of them. It was designed this way so that I could encode a whole season (or many seasons) with one click.
+
+ `ffmpeg` and `ffprobe` (should be bundled with ffmpeg) must be installed to use this script. It can be checked by typing `ffmpeg -version` into system's terminal/command promp, which should output something like:
+
+ ```bash
+ffmpeg version 4.2.4-1ubuntu0.1 Copyright (c) 2000-2020 the FFmpeg developers
+built with gcc 9 (Ubuntu 9.3.0-10ubuntu2)
+configuration: (bla bla bla a lot of stuffs)
+ ```
+
+ Script accepts `--ffmpeg /path/to/ffmpeg` and `--ffprobe /path/to/ffprobe` as parameter so that a given ffmpeg will be used. The script will try to make sure that ffmpeg is available before encoding.
 
 ## Known issue / Changelog / and other stuff
 
@@ -96,6 +124,12 @@
 
  And when I say "ffmpeg is better than HandBrake in terms of quality" eariler, I was checking the two result frame by frame. But when I sit down, lay back, and play both files side by side, they both look good and doesn't hurt my eye. As an average viewer, I hardly notice the difference (that being said, I still prefer ffmpeg, and my rename feature).
 
- GUI in progress but I'm not sure if I want to continue making it.
+ GUI in progress but I'm not sure if I want to continue making it. This is how it looks like, for now:
+
+ ![the main page](README_ASSETS/Screenshot from 2023-03-08 13-18-44.png)
+
+ Encoder settings tab is a complete disaster (because I have no idea how to present encode paramaters). :(
+
+![Encoder settings tab is a disaster](README_ASSETS/Screenshot from 2023-03-08 13-23-42.png)
 
  I'm not sure if I...(*abruptly stopped typing*) (*lean back looking up*) (*dead fish eyes*)

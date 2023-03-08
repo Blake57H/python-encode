@@ -511,7 +511,7 @@ def update_filename(
 def get_episode_resolution(episode_file: Path, ffprobe_exec="ffprobe") -> (Tuple[int, int] or None):
     width, height = (None,) * 2
     # trying to read resolution from file itself using ffprobe
-    if get_ff_version(ffprobe_exec) is None:
+    if get_ff_version(ffprobe_exec, 'ffprobe') is None:
         print("ffprobe not installed, install ffmpeg to continue: https://ffmpeg.org/download.html")
         return width, height
     try:
