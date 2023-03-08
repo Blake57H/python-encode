@@ -1,0 +1,94 @@
+{
+  "encode_settings": {
+    "audio_bitrate": 96,
+    "audio_codec": "libopus",
+    "resolution_height": 720,
+    "video_codec": "libx265",
+    "video_quality": 24.2,
+    "preset": "slow",
+    "video_profile": "main10",
+    "video_codec_params": {
+      "video_codec_params_spliter": ":",
+      "video_codec_params_name": "x265-params",
+      "video_codec_params_value": [
+        {
+          "param": "me",
+          "value": 2
+        },
+        {
+          "param": "rd",
+          "value": 4
+        },
+        {
+          "param": "subme",
+          "value": 7
+        },
+        {
+          "param": "aq-mode",
+          "value": 3
+        },
+        {
+          "param": "aq-strength",
+          "value": 1
+        },
+        {
+          "param": "deblock",
+          "value": "1,1"
+        },
+        {
+          "param": "psy-rd",
+          "value": 1
+        },
+        {
+          "param": "psy-rdoq",
+          "value": 1
+        },
+        {
+          "param": "rdoq-level",
+          "value": 2
+        },
+        {
+          "param": "merange",
+          "value": 57
+        },
+        {
+          "param": "bframes",
+          "value": 8
+        },
+        {
+          "param": "b-adapt",
+          "value": 2
+        },
+        {
+          "param": "limit-sao",
+          "value": 1
+        },
+        {
+          "param": "no-info",
+          "value": 1
+        }
+      ]
+    },
+    "pix_fmt": "yuv420p10le",
+    "vf": {
+      "vf_spliter": ",",
+      "vf_name": "vf",
+      "vf_value": [
+        {
+          "param": "smartblur",
+          "value": "1.5:-0.35:-3.5:0.65:0.25:2.0"
+        },
+        {
+          "param": "scale",
+          "value": "-1:720:spline+accurate_rnd+full_chroma_int"
+        }
+      ]
+    },
+    "color_range": 1,
+    "color_primaries": 1,
+    "color_trc": 1,
+    "colorspace": 1,
+    "attachment_copy": true
+  },
+  "naming": "[src={group}] {episode_name} ({resolution}p) [H265-10bit] [{crc}]"
+}

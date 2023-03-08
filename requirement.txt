@@ -1,0 +1,4 @@
+about-time==4.2.1
+alive-progress==3.0.1
+ffmpeg-python==0.2.0
+grapheme==0.6.0
