@@ -126,10 +126,10 @@ configuration: (bla bla bla a lot of stuffs)
 
  GUI in progress but I'm not sure if I want to continue making it. This is how it looks like, for now:
 
- ![the main page](README_ASSETS/Screenshot from 2023-03-08 13-18-44.png)
+ ![(README_ASSETS/Screenshot from 2023-03-08 13-18-44.png)](https://github.com/Blake57H/python-encode/blob/4702eb124c12cdadab74015377d78d00c3740733/README_ASSETS/Screenshot%20from%202023-03-08%2013-18-44.png)
 
  Encoder settings tab is a complete disaster (because I have no idea how to present encode paramaters). :(
 
-![Encoder settings tab is a disaster](README_ASSETS/Screenshot from 2023-03-08 13-23-42.png)
+![(README_ASSETS/Screenshot from 2023-03-08 13-23-42.png)](https://github.com/Blake57H/python-encode/blob/4702eb124c12cdadab74015377d78d00c3740733/README_ASSETS/Screenshot%20from%202023-03-08%2013-23-42.png)
 
  I'm not sure if I...(*abruptly stopped typing*) (*lean back looking up*) (*dead fish eyes*)
