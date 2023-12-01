@@ -1,0 +1,18 @@
+{
+  "preset_name": "SSA 1080P (HEVC+AAC)",
+  "input": {
+  },
+  "video": {
+    "c": "libx265",
+    "profile": "main"
+  },
+  "audio": {
+    "c": "aac",
+    "b": "192k"
+  },
+  "subtitle": {
+    "c": "copy" 
+  },
+  "keep_attachments": true,
+  "keep_chapters": true
+}

@@ -1,0 +1,18 @@
+{
+  "containers": {
+    ".mkv": "Matroska (mkv)",
+    ".mp4": "MPEG-4 (mp4)"
+  },
+  "video_codecs": [
+    "copy",
+    "libx265",
+    "libx264"
+  ],
+  "audio_codecs": [
+    "copy",
+    "libopus"
+  ],
+  "subtitle_codecs": [
+    "copy"
+  ]
+}

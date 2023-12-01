@@ -1,24 +1,32 @@
 """
 It will be abandoned sooner or later
+
+Edit Aug 2023:
+    I am considering refactoring this script. Currently it is a big mess.
+    Refactored script will be named "main_cli.py"
+
+Edit Aug 30 2023:
+    Deprecation for this file is planned because of code refactor.
 """
 
 # from modules import SleepModule
 import argparse
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import ffmpeg
 from alive_progress import alive_bar
 
 from custom_objects import SSAEncodeProfile, ParameterObject
-from utils import extract_names, get_episode_duration, update_filename, verify_crc32, print_msg, get_ff_version, \
+from utils_deprecating import extract_names, get_episode_duration, update_filename, verify_crc32, print_msg, get_ff_version, \
     SleepModule, read_presets
 
 
@@ -277,7 +285,7 @@ def main(
                 **ffmpeg_arguments_dict
             )
             # ffmpeg_stream = ffmpeg.overwrite_output(ffmpeg_stream)
-            command:List = ffmpeg.compile(ffmpeg_stream, ffmpeg_path, overwrite_output=True)
+            command: List = ffmpeg.compile(ffmpeg_stream, ffmpeg_path, overwrite_output=True)
             # todo: some issue with hw decoder "Option hwaccel (use HW accelerated decoding) cannot be applied to output"
             if ffmpeg_arguments_obj.hardware_acceleration is not None:
                 # `hwaccel` is positioned before `-i`
@@ -288,30 +296,44 @@ def main(
             # stderr = sys.stderr if ffmpeg_verbose else subprocess.STDOUT
             regex_search = re.compile('frame= *(\d+)')
             print_msg(f"Start encoding: {file_in.name.__str__()}")
-            with alive_bar(source_frame_count, title="Encoding", force_tty=True) as bar:
-                bar(-1)
-                if debug:
-                    print_msg("DEBUG: ffmpeg command: " + " ".join(command))
-                result = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-                while result.poll() is None:
-                    txt = result.stdout.readline().strip()
-                    if ffmpeg_verbose: print(txt)
-                    frame = regex_search.match(txt)
-                    if frame is not None:
-                        bar( int(frame.groups()[0]) - bar.current )
-                # result = subprocess.run(command, shell=False, stdout=stdout, stderr=stderr)
-            if result.returncode != 0:
+            result: Optional[subprocess.Popen] = None
+            try:
                 with alive_bar(source_frame_count, title="Encoding", force_tty=True) as bar:
                     bar(-1)
                     if debug:
-                        print_msg(f"DEBUG: ffmpeg command: \n{command}")
-                    result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+                        print_msg("DEBUG: ffmpeg command: " + " ".join(command))
+                    result = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                              universal_newlines=True)
                     while result.poll() is None:
                         txt = result.stdout.readline().strip()
                         if ffmpeg_verbose: print(txt)
                         frame = regex_search.match(txt)
                         if frame is not None:
-                            bar( int(frame.groups()[0]) - bar.current )
+                            bar(int(frame.groups()[0]) - bar.current)
+                    # result = subprocess.run(command, shell=False, stdout=stdout, stderr=stderr)
+                if result.returncode != 0:
+                    # ffmpeg seems to be adding an extra frame to encoder when encoding
+                    with alive_bar(source_frame_count + 1, title="Encoding", force_tty=True) as bar:
+                        bar(-1)
+                        if debug:
+                            print_msg(f"DEBUG: ffmpeg command: \n{command}")
+                        result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                                  universal_newlines=True)
+                        while result.poll() is None:
+                            txt = result.stdout.readline().strip()
+                            if ffmpeg_verbose: print(txt)
+                            frame = regex_search.match(txt)
+                            if frame is not None:
+                                bar(int(frame.groups()[0]) - bar.current)
+            except KeyboardInterrupt as ex:
+                print_msg("User pressed Ctrl+C.")
+                if isinstance(result, subprocess.Popen):
+                    result.send_signal(signal.SIGTERM)
+                    print_msg("Waiting for ffmpeg to stop...")
+                while result.poll() is None:
+                    pass
+                print_msg("Exiting...")
+                exit(0)
             if result.returncode != 0:
                 warnings.warn(
                     "ffmpeg did not complete encode, check console output or log (run with '--ffmpeg-verbose' argument)"

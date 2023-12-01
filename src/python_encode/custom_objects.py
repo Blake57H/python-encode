@@ -1,7 +1,13 @@
-import enum
-from pathlib import Path
-from typing import Any, Iterable, List, Dict, Tuple, overload
+""" I believe refactor is required... (utils and custom_object are a mess) (better than when it started but still a mess) """
 
+import enum
+import json
+import logging
+import warnings
+from pathlib import Path
+from typing import Any, Iterable, List, Dict, Tuple, Optional, Union, Set
+
+logger = logging.getLogger(__name__)
 
 
 class TypeEnum(enum.Enum):
@@ -19,32 +25,197 @@ class ParameterObject:
         self.param: str = param
         self.value: str = str(value)
 
-    def to_param(self) -> (None):
+    def to_param(self) -> None:
         """Not implemented, DO NOT USE"""
         pass
 
-class AnimeObject:
+
+class EncodePresetObject:
+    __slots__ = (
+        'preset_dir',
+        'preset_name',
+        'stream_params',
+        'extra_options',
+        'naming',
+        'tag_divider',
+        'container_extension'
+    )
+
+    def __init__(self, preset_dir: Optional[Path] = ...):
+        self.preset_dir: Optional[Path] = preset_dir
+        self.preset_name: str = "FFMPEG DEFAULT"
+        self.naming: str = ""
+        self.tag_divider: str = " "
+        self.stream_params: Dict[str, Union[str, int, float]] = dict()
+        self.extra_options: list = list()
+        self.container_extension = '.mkv'  # fixme: should this setting be here?
+        # self.keep_chapters = True
+        # self.keep_attachments = True
+        # self.use_hardware_accleration = True
+
+        if not isinstance(preset_dir, Path):
+            logger.debug(f"Creating empty preset from non-Path object: {type(preset_dir)}")
+            return
+
+        # fixme: until I think of a better place for these configs
+        naming_file = preset_dir / "naming.txt"
+        if naming_file.is_file():
+            self.naming = naming_file.read_text().strip()
+
+        tag_divider_file = preset_dir / "tag_divider.txt"
+        if tag_divider_file.is_file():
+            self.tag_divider = tag_divider_file.read_text().strip()
+
+        stream_specific_option_file = preset_dir / "basic.json"
+        if stream_specific_option_file.is_file():
+            self.stream_params = json.loads(stream_specific_option_file.read_bytes())
+            self.preset_name = self.stream_params.get("preset_name", self.preset_name)
+
+        extra_option_file = preset_dir / "extra_param.txt"
+        if extra_option_file.is_file():
+            reading_text = False
+            arg_buffer = []
+            for arg in extra_option_file.read_text().strip().split():
+                if arg.startswith('"'):
+                    reading_text = True
+                    arg_buffer.clear()
+                if reading_text:
+                    arg_buffer.append(arg.strip('"'))
+                else:
+                    self.extra_options.append(arg)
+                if arg.endswith('"'):
+                    reading_text = False
+                    self.extra_options.append(' '.join(arg_buffer))
+                    arg_buffer.clear()
+
+        logger.debug(self.__str__())
+
+    def __str__(self):
+        return f"""EncodePresetObject:
+preset_dir={self.preset_dir.absolute() if isinstance(self.preset_dir, Path) else 'Empty'}, is_dir={self.preset_dir.is_dir() if isinstance(self.preset_dir, Path) else False}
+preset_name={self.preset_name}
+naming={self.naming}
+tag_divider={self.tag_divider}
+stream_params={self.stream_params}
+extra_options={self.extra_options}
+container_extension={self.container_extension}
+        """
+
+
+class AnimeFileObject:
+    """ Trying to combine 'AnimeObject' and 'ExtractedNameObject' """
+
     __slots__ = (
         'file',
         'file_name',
+
+        'video_stream_indexes',
+        'audio_stream_indexes',
+        'subtitle_stream_indexes',
+        'attachment_stream_indexes',
+        'chapters',
+        'video_resolution',
+        'video_length_seconds',
+        'video_frame_count',
+
+        'release_group',
+        'episode_name',
+        'episodes',
+        'crc32',
+
+        'omittable_tags',
+        'non_omittable_tags'
+    )
+
+    def __init__(self) -> None:
+        # file bytes related
+        self.file: Optional[Path] = None
+        self.file_name: Optional[str] = None
+
+        # basically ffprobe
+        self.video_stream_indexes: set[int] = set()
+        self.audio_stream_indexes: set[int] = set()
+        self.subtitle_stream_indexes: set[int] = set()
+        self.attachment_stream_indexes: set[int] = set()
+        self.chapters: list[
+            tuple[str, str, str]] = list()  # chapter list of start time (in second), end time (in second), title
+        self.video_resolution: Tuple[Optional[str], Optional[str]] = (None, None)  # width by height, in pixel, numeric
+        self.video_length_seconds: Optional[float] = None  # I wonder if floating point precision is an issue
+        self.video_frame_count: Optional[int] = None
+
+        # file name related
+        self.release_group: Optional[str] = None
+        self.episode_name: Optional[str] = None
+        self.episodes: Optional[str] = None  # it's a placeholder.
+        self.crc32: Tuple[Optional[str], Optional[str]] = (None, None)  # (file bytes, filename label)
+
+        # fixme: if there are better namings
+        self.omittable_tags: set[str] = set()  # tags that should be updated, like resolution, codec and checksum
+        # tags that should not be modified, like video source such as "BD" and "WEB-DL"
+        self.non_omittable_tags: set[str] = set()
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, AnimeFileObject) \
+            and (
+                    (self.file is None and other.file is None) or
+                    (self.file is Path and other.file is Path and self.file.samefile(other.file))
+            ) and self.file_name == other.file_name \
+            and len(list(set(self.chapters).difference(set(other.chapters)))) == 0 \
+            and self.crc32 == other.crc32 \
+            and self.video_resolution == other.video_resolution \
+            and self.video_length_seconds == other.video_length_seconds \
+            and self.video_frame_count == other.video_frame_count \
+            and self.release_group == other.release_group \
+            and self.episode_name == other.episode_name \
+            and self.omittable_tags.__eq__(other.omittable_tags) \
+            and self.non_omittable_tags.__eq__(other.non_omittable_tags)
+
+    def __str__(self) -> str:
+        return \
+            f"""
+File Info:
+    Full Path: {self.file}
+    Name: {self.file_name}
+    Chapters: {[chapter[2] for chapter in self.chapters]}
+    CRC (calculated, filename): {self.crc32}
+    Resolution: {'Unknown' if None in self.video_resolution else 'x'.join(self.video_resolution)}
+    Length: {self.video_length_seconds} seconds, {self.video_frame_count} frames
+    Group: {self.release_group}
+    Episode Name: {self.episode_name}
+    Episode (unavailable for now): {self.episodes}
+    Omittable Tags: {[item for item in self.omittable_tags]}
+    Non Omittable Tags: {[item for item in self.non_omittable_tags]}  
+"""
+
+    def get_all_stream_indexes(self) -> Set:
+        return set().union(self.video_stream_indexes, self.audio_stream_indexes, self.subtitle_stream_indexes, self.attachment_stream_indexes)
+
+
+class AnimeObject:
+    """ abandoned and may remove in the future """
+    __slots__ = (
+        'file',
         'file_crc32',
         'video_resolution',
         'video_length',
+        'release_group',
+        'episode_name',
         'filename_info'
-    )    
+    )
+
     def __init__(self) -> None:
+        warnings.warn(f"Class {self.__class__} deprecating or deprecated", DeprecationWarning)
         self.file: Path = None
-        self.file_name: str = None
         self.file_crc32: str = None
         self.video_resolution: Tuple[str, str] = (None, None)
         # video_length: [seconds, frames]. As long as I don't do division float percision isn't a concern? 
-        self.video_length: Tuple[float, int] = (None, None) 
+        self.video_length: Tuple[float, int] = (None, None)
         self.filename_info: ExtractedNameObject = None
 
     def __str__(self) -> str:
         return f"File Info: \n" \
-               f"\tFull Path: {self.file}\n" \
-               f"\tName: {self.file_name}\n" \
+               f"\tFull Path: {self.file.absolute().__str__()}\n" \
+               f"\tName: {self.file.name}\n" \
                f"\tFile CRC: {self.file_crc32}\n" \
                f"\tResolution: {'x'.join(map(str, self.video_resolution))} \n" \
                f"\tLength: {self.video_length[0]} seconds, {self.video_length[1]} frames \n" \
@@ -63,6 +234,7 @@ class ExtractedNameObject:
     )
 
     def __init__(self) -> (None):
+        warnings.warn(f"Class {self.__class__} deprecating or deprecated", DeprecationWarning)
         self.filename: str = ""
         # basic info, I think
         self.release_group: str = ""
@@ -101,6 +273,7 @@ class SSAEncodeProfile:
     update:
     I'm now switching to json files to store preset.
     """
+
     class ParamList:
         """
         For video codec parameters
@@ -214,9 +387,10 @@ class SSAEncodeProfile:
     def as_ffmpeg_python_args(self) -> (Dict):
         to_return = {'c:a': self.audio_codec,
                      'c:v': self.video_codec,
+                     'c:s': self.subtitle_decoder,
                      'b:a': f'{self.audio_bitrate}k',
                      'profile:v': self.video_profile,
-                    #  self.video_codec_params.name: self.video_codec_params.as_string_params(),
+                     #  self.video_codec_params.name: self.video_codec_params.as_string_params(),
                      'crf': self.video_quality,
                      'preset': self.preset,
                      'pix_fmt': self.pix_fmt,
@@ -225,7 +399,7 @@ class SSAEncodeProfile:
                      'color_primaries': self.color_primaries,
                      'color_trc': self.color_trc,
                      'colorspace': self.colorspace,
-                    #  'hwaccel': self.hardware_accleration
+                     #  'hwaccel': self.hardware_accleration
                      }
         # todo: subtitle decoder for MP4 container
         if self.video_codec_params.name is not None and self.video_codec_params._params_length > 0:
@@ -238,7 +412,7 @@ class SSAEncodeProfile:
             self.vf.add_param(
                 'scale', f'-1:{resolution}:spline+accurate_rnd+full_chroma_int'
             )
-        else: 
+        else:
             self.vf.add_param(
                 'scale', f'-1:{resolution}'
             )
@@ -301,7 +475,7 @@ class TagList:
     def is_ready(self) -> (bool):
         # todo: probably deprecated?
         return self.get_tag_index_by_type(TypeEnum.GROUP) is not None and \
-               self.get_tag_index_by_type(TypeEnum.EPISODE_NAME) is not None
+            self.get_tag_index_by_type(TypeEnum.EPISODE_NAME) is not None
 
     def get_size(self) -> (int):
         return len(self.tags)
@@ -318,6 +492,10 @@ class EncodeListAbstract:
 
     def get_names(self):
         return [_ for _ in self.NAME_DICT.keys()]
+    
+    @property
+    def values(self) -> List[str]:
+        return [_ for _ in self.NAME_DICT.values()]
 
 
 class EncodeContainerList(EncodeListAbstract):
@@ -328,16 +506,70 @@ class EncodeContainerList(EncodeListAbstract):
 
 class EncodeVideoCodecList(EncodeListAbstract):
     NAME_DICT = {
-        'copy': 'copy',
+        'Copy': 'copy',
         'HEVC (x265)': 'libx265'
     }
 
 
 class EncoderAudioCodecList(EncodeListAbstract):
     NAME_DICT = {
-        'copy': 'copy',
-        'opus': 'libopus'
+        'Copy': 'copy',
+        'Opus': 'libopus'
     }
+
+
+class ProgramInfo:
+    __slots__ = (
+        '__program_name__',
+        '__ready__',
+        '__program_exec__',
+        '__default_program_exec__'
+    )
+
+    @staticmethod
+    def new(program: str):
+        return ProgramInfo(program, program, program)
+        # if not isinstance(program, str):
+        #     raise TypeError(f"expect str, got {type(program)}")
+        # self.__program_name__ = program
+        # self.__program_exec__ = program
+        # self.__default_program_exec__ = program
+
+    def __init__(self, program_name: str, program_exec: str, default_exec: str):
+        self.__program_name__ = program_name
+        self.__ready__ = False
+        if not isinstance(program_exec, str):
+            raise TypeError(f"expect str, got {type(program_exec)}")
+        self.__program_exec__ = program_exec
+        self.__default_program_exec__ = default_exec
+        
+    def set_ready(self, is_ready: bool):
+        self.__ready__ = is_ready
+
+    @property
+    def is_ready(self) -> bool:
+        return self.__ready__
+
+    @property
+    def default_exec(self) -> str:
+        return self.__default_program_exec__
+    
+    @property
+    def executable(self) -> str:
+        return self.__program_exec__
+
+    @executable.setter
+    def executable(self, program_exec: str):
+        if not isinstance(program_exec, str):
+            raise TypeError(f"expect str, got {type(program_exec)}")
+        self.__program_exec__ = program_exec
+
+    def set_executable(self, program_exec: str):
+        self.executable = program_exec
+        
+    @property
+    def program_name(self) -> str:
+        return self.__program_name__
 
 
 if __name__ == "__main__":

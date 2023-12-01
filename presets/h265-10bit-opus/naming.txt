@@ -1,0 +1,1 @@
+[src={release_group}] {episode_name} ({resolution_height}p) [H265-10bit] [{crc32}]

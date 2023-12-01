@@ -1,0 +1,19 @@
+{
+  "preset_name": "Compatibility 1080P (AVC1+AAC)",
+  "input": {
+    "hwaccel": "auto"
+  },
+  "video": {
+    "c": "libx264",
+    "profile": "main"
+  },
+  "audio": {
+    "c": "aac",
+    "b": "128k"
+  },
+  "subtitle": {
+    "c": "copy" 
+  },
+  "keep_attachments": true,
+  "keep_chapters": true
+}

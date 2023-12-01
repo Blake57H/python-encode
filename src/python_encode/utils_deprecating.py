@@ -1,6 +1,13 @@
+"""
+I think this is also a big mess and I'm thinging about a remake.
+A complete custom encode preset is a bad idea (I have to write the serialization and deserialization myself)
+    -> a bunch of plain text command line arguments that can be copy-pasted should be enough?
+"""
+
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from json import JSONDecoder
 import re
@@ -9,7 +16,7 @@ import time
 import zlib
 from datetime import datetime, timedelta
 
-from custom_objects import AnimeObject, ExtractedNameObject, ParameterObject, SSAEncodeProfile, TagList, TypeEnum, Tag
+from python_encode.custom_objects import AnimeObject, ExtractedNameObject, ParameterObject, SSAEncodeProfile, TagList, TypeEnum, Tag
 # from language import language # utils.py won't import QT stuff
 # from utils_qt import tr   # translations will only be available at GUI related method
 
@@ -27,6 +34,10 @@ I still have trouble understanding python regular expression and I thought writi
 is a good idea....
 Basically me reading SSA's code and trying to figure out how it works...
 """
+
+def dummy_function(*args, **kwargs):
+    """may be I can use a dummy thing so that 'utils.py' will not import 'alive_progress'"""
+    pass # do nothing
 
 
 class SleepModule:
@@ -142,9 +153,9 @@ def is_string_empty(subject: str) -> bool:
 
 
 def anime_to_anime_object(file: Path, ffprobe: str = 'ffprobe', 
-                          progress_emit: Optional[callable[int]] = ..., 
-                          abort_signal: Optional[callable] = ...,
-                          debug: bool = False) -> AnimeObject|None:
+                          progress_emit: Optional[Callable[[int], None]] = ..., 
+                          abort_signal: Optional[Callable[[None], bool]] = ...,
+                          debug: bool = False, use_alive_progress = True) -> AnimeObject|None:
     """
     Read information from an video file using ffprobe.
     Return `None` if parse failed.
@@ -155,6 +166,7 @@ def anime_to_anime_object(file: Path, ffprobe: str = 'ffprobe',
         _logger.warning('File "%s" is invalid.', file)
         return None
     if not isinstance(abort_signal, Callable):
+        logging.debug(f"type(abort_signal)={type(abort_signal)}!=Callable")
         abort_signal = None
     anime = AnimeObject()
     anime.file = file
@@ -167,7 +179,7 @@ def anime_to_anime_object(file: Path, ffprobe: str = 'ffprobe',
         _logger.warning('Unable to read video resolution with ffprobe: %s', file)
         return None
     anime.file_name = file.name
-    anime.file_crc32 = get_episode_crc32(file, report_progress=progress_emit, abort_signal=abort_signal)
+    anime.file_crc32 = get_episode_crc32(file, report_progress=progress_emit, abort_signal=abort_signal, use_alive_bar=use_alive_progress)
     
     episode_info = ExtractedNameObject()
     episode_info.filename = anime.file_name
@@ -449,23 +461,36 @@ def get_episode_crc32(file: Path, use_alive_bar: bool = True, report_progress: c
     def execute(bar=None, progress=False):
         with open(file.__str__(), 'rb') as fh:
             hash_val = 0
+            current_size = 0
             # ~ while abort_signal is None or abort_signal() == False
             while not abort_signal or not abort_signal():
                 s = fh.read(65536)
+                current_size += len(s)
                 if not s:
                     break
                 if bar: bar(len(s))
-                if progress: report_progress(int(bar.current/file.stat().st_size*100))
+                if progress: report_progress(int(current_size/file.stat().st_size*100))
                 hash_val = zlib.crc32(s, hash_val)
             # return "%08X" % (hash & 0xFFFFFFFF)
             return format((hash_val & 0xFFFFFFFF), '08X')
 
-    enable_progress_report = isinstance(report_progress, Callable) and file.stat().st_size and use_alive_bar
-    if use_alive_bar:
+    enable_gui_progress_report = file.stat().st_size and isinstance(report_progress, Callable) # and use_alive_bar
+    logging.debug(f"enable_gui_progress_report={enable_gui_progress_report}; ")
+    # print(isinstance(abort_signal, Callable))
+    # logging.debug(f"abort_signal={type(abort_signal()) if isinstance(abort_signal, function) else type(abort_signal)}")
+    try:
+        if sys.stdout is None:
+            use_alive_bar = False
         from alive_progress import alive_bar
+    except ModuleNotFoundError as ex:
+        # continue execute without alive_bar
+        use_alive_bar = False
+        logging.debug(f"Failed to import 'alive_progress': {ex.msg}")
+    if use_alive_bar:
         with alive_bar(file.stat().st_size, title="Checking CRC32", force_tty=True) as bar:
-            return execute(bar, enable_progress_report)
-    return execute()
+            return execute(bar, enable_gui_progress_report)
+    # return "12345678"
+    return execute(progress=enable_gui_progress_report)
 
 
 def update_filename(
@@ -508,10 +533,10 @@ def update_filename(
         return episode_file.parent.joinpath(filename)
 
 
-def get_episode_resolution(episode_file: Path, ffprobe_exec="ffprobe") -> (Tuple[int, int] or None):
+def get_episode_resolution(episode_file: Path, ffprobe_exec="ffprobe", do_ff_check = True) -> (Tuple[int, int] or None):
     width, height = (None,) * 2
     # trying to read resolution from file itself using ffprobe
-    if get_ff_version(ffprobe_exec, 'ffprobe') is None:
+    if do_ff_check and get_ff_version(ffprobe_exec, 'ffprobe') is None:
         print("ffprobe not installed, install ffmpeg to continue: https://ffmpeg.org/download.html")
         return width, height
     try:
@@ -522,22 +547,22 @@ def get_episode_resolution(episode_file: Path, ffprobe_exec="ffprobe") -> (Tuple
                 width, height = res
                 break
     except ffmpeg.Error as ex:
-        # should I do something here?
+        # fixme: should I do something here?
         pass
     finally:
         return width, height
 
 
-def get_episode_duration(episode_file: Path, ffprobe_exec="ffprobe") -> Tuple[float, int]:
+def get_episode_duration(episode_file: Path, ffprobe_exec="ffprobe", do_ff_check = True) -> Tuple[float, int]:
     # print(episode_file)
     _logger = logging.getLogger(__name__)
-    if get_ff_version(ffprobe_exec, 'ffprobe') is None:
+    if do_ff_check and get_ff_version(ffprobe_exec, 'ffprobe') is None:
         _logger.error("ffprobe not installed, install ffmpeg to continue: https://ffmpeg.org/download.html")
         return None, None
     source_duration = None
     source_frame_count = None
     try:
-        source_info = ffmpeg.probe(episode_file, cmd=ffprobe_exec)
+        source_info: Dict = ffmpeg.probe(episode_file, cmd=ffprobe_exec)
         duration_str = source_info.get("format").get("duration")
         if duration_str is not None:
             source_duration = float(duration_str)
@@ -598,7 +623,7 @@ def get_ff_version(path: str, app_name: str = ..., **kwargs) -> (str | int | Non
     to_return = None
     debug = kwargs.get('debug', False)
     try:
-        sp = subprocess.run([path, "-version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        sp = subprocess.run([path, "-version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=subprocess.DETACHED_PROCESS)
         if sp.returncode == 0:
             to_return = sp.stdout.decode().split('\n')[0].split('\r')[0]
             logging.debug(to_return)
@@ -722,7 +747,7 @@ def setup_logger(
 if __name__ == "__main__":
     test = 3
     if test == 3:
-        read_presets(Path("presets/my_encode_profile_h265_10bit_720p_opus.json"))
+        read_presets(Path("../../presets/my_encode_profile_h265_10bit_720p_opus.json"))
     elif test == 2:
         episode = Path(
             r"E:\torrent\[SubsPlease] Komi-san wa, Comyushou desu. - 01 (1080p) [75117D8F].mkv"

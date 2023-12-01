@@ -1,0 +1,26 @@
+{
+  "preset_name": "H265 10bit 24.2 Opus 720P",
+  "input": {
+    "hwaccel": "auto"
+  },
+  "video": {
+    "c": "libx265",
+    "pix_fmt": "yuv420p10le",
+    "s": null,
+    "crf": "24.2",
+    "preset": "slow",
+    "profile": "main10"
+  },
+  "audio": {
+    "c": "libopus",
+    "b": "96k"
+  },
+  "subtitle": {
+    "c": "copy"
+  },
+  "other": {
+    "keep_attachments": true,
+    "keep_chapters": true,
+    "container": ".mkv"
+  }
+}

@@ -1,0 +1,3 @@
+I NEED A NEW SOLUTION FOR PRESETS
+For example using a Handbrake-compatiable format.
+I don't like creating my own format.
