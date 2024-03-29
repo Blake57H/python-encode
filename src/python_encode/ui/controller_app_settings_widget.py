@@ -161,7 +161,7 @@ class AppSettingsWidget(QWidget, Ui_Form):
 
     def _dialogue_open_file(self, title: str, file_filter: str) -> Optional[str]:
         """Open file select dialogue and retrieve user selected ffmpeg/ffprobe path"""
-        result = QFileDialog.getOpenFileName(self, title, filter=file_filter)[0]
+        result = QFileDialog.getOpenFileName(self, title, filter=file_filter, options=QFileDialog.Option(QFileDialog.Option.DontResolveSymlinks))[0]
         logger.debug(f"open file dialog, ffmpeg: '{result}'")
         if result == '': return None
         return result

@@ -23,6 +23,7 @@ class AnimeProcessor:
 
     @staticmethod
     def probe_file(file: Path, ffprobe_path: str = ffprobe) -> dict:
+        # eqvalant cmd: ffprobe {file} -show_format -show_streams -show_chapters -print_format json >> probe.json
         probe_result = subprocess.run([
             ffprobe_path,
             file.absolute().__str__(),
